@@ -208,8 +208,9 @@ let allData = [], activeFilter = "all", sortField = "score_global", sortDir = -1
 async function loadData() {
   document.getElementById("last-scan").textContent = "Chargement...";
   try {
-    const r    = await fetch(CSV_URL + "&t=" + Date.now());
-    const text = await r.text();
+const r    = await fetch(CSV_URL + "&t=" + Date.now());
+const buffer = await r.arrayBuffer();
+const text = new TextDecoder("utf-8").decode(buffer);
     const rows = parseCSV(text);
     if (rows.length < 2) { showEmpty("Aucune donnée"); return; }
     const headers = rows[0].map(h => h.trim());
