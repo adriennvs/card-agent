@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-BUDGET_MAX  = 50
+BUDGET_MAX  = 150
 SCORE_ALERT = 70
 
 SHEET_NAME       = os.getenv("GOOGLE_SHEET_NAME", "Card Agent")
@@ -44,10 +44,12 @@ HEADERS = {
 # ─── Mots-clés ────────────────────────────────────────────────────────────────
 
 DBZ_SEARCH_TERMS = [
+    "le grand combat dragon ball",
+    "hondan dragon ball",
     "carddass dragon ball",
-    "dragon ball z cartes",
-    "cartes dragon ball",
-    "lot dragon ball cartes",
+    "super battle dragon ball",
+    "visual adventure dragon ball",
+    "cartes dbz",
 ]
 
 DBZ_HIGH_VALUE = [
