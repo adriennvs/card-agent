@@ -134,12 +134,12 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
         log.warning("SCRAPEBADGER_API_KEY non configurée")
         return []
     try:
-r = requests.get(
-    "https://scrapebadger.com/v1/vinted/search",
-    headers={
-        "x-api-key": SCRAPEBADGER_KEY,
-        "Accept":    "application/json",
-    },
+        r = requests.get(
+            "https://scrapebadger.com/v1/vinted/search",
+            headers={
+                "x-api-key": SCRAPEBADGER_KEY,
+                "Accept":    "application/json",
+            },
             params={
                 "query":    query,
                 "market":   "fr",
@@ -163,7 +163,7 @@ r = requests.get(
         items = []
         for item in data.get("items", []):
             try:
-price = float(item.get("price", 0) or 0)
+                price = float(item.get("price", 0) or 0)
             except Exception:
                 continue
 
@@ -171,13 +171,12 @@ price = float(item.get("price", 0) or 0)
                 continue
 
             item_id = item.get("id", "")
-            seller  = item.get("seller", item.get("user", {}))
             items.append({
                 "titre":      str(item.get("title", "")).strip(),
                 "prix":       price,
                 "etat":       str(item.get("status", item.get("condition", ""))),
-                "vendeur":    str(seller.get("username", seller.get("login", ""))),
-                "lien":       f"https://www.vinted.fr/items/{item_id}",
+                "vendeur":    str(item.get("user", {}).get("login", "")),
+                "lien":       item.get("url", f"https://www.vinted.fr/items/{item_id}"),
                 "plateforme": "vinted",
                 "query":      query,
             })
