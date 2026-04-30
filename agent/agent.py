@@ -134,12 +134,12 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
         log.warning("SCRAPEBADGER_API_KEY non configurée")
         return []
     try:
-        r = requests.get(
-            "https://scrapebadger.com/v1/vinted/search",
-            headers={
-                "Authorization": f"Bearer {SCRAPEBADGER_KEY}",
-                "Accept":        "application/json",
-            },
+r = requests.get(
+    "https://scrapebadger.com/v1/vinted/search",
+    headers={
+        "x-api-key": SCRAPEBADGER_KEY,
+        "Accept":    "application/json",
+    },
             params={
                 "query":    query,
                 "market":   "fr",
