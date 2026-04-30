@@ -163,11 +163,7 @@ r = requests.get(
         items = []
         for item in data.get("items", []):
             try:
-                price_raw = item.get("price", {})
-                if isinstance(price_raw, dict):
-                    price = float(price_raw.get("amount", 0))
-                else:
-                    price = float(price_raw)
+price = float(item.get("price", 0) or 0)
             except Exception:
                 continue
 
