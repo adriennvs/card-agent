@@ -374,6 +374,16 @@ def run():
     sh = get_sheet()
     ensure_sheets(sh)
     ws_opp = sh.worksheet("opportunites")
+# Vide les données en gardant les entêtes
+ws_opp.clear()
+ws_opp.append_row([
+    "date_scan", "univers", "titre", "prix_annonce",
+    "prix_marche_ref", "marge_estimee", "ratio_x",
+    "score_global", "score_ratio", "score_liquidite", "score_valeur",
+    "nb_ventes_ref", "mots_cles_valeur",
+    "plateforme", "etat", "vendeur",
+    "rationale", "lien_annonce"
+])
     ws_ref = sh.worksheet("prix_reference")
 
     all_scored: list[dict] = []
