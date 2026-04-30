@@ -376,7 +376,7 @@ def run():
 
     for query in dbz_queries:
         annonces = search_vinted(query)
-        time.sleep(1.5)
+        time.sleep(4)
 
         for ann in annonces:
             if ann["lien"] in seen_urls:
