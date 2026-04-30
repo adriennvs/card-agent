@@ -48,13 +48,11 @@ HEADERS = {
 # ─── Mots-clés ────────────────────────────────────────────────────────────────
 
 DBZ_SEARCH_TERMS = [
-    "carddass hondan",
-    "le grand combat dragon ball",
-    "super battle dragon ball",
-    "power level dragon ball",
-    "visual adventure dragon ball",
-    "cartes dragon ball z années 90",
-    "lot cartes dragon ball z",
+    "carddass dragon ball",
+    "dragon ball z cartes",
+    "dragon ball cartes vintage",
+    "lot dragon ball z cartes",
+    "cartes dragon ball",
 ]
 
 DBZ_HIGH_VALUE = [
@@ -66,14 +64,10 @@ DBZ_HIGH_VALUE = [
 ]
 
 YGO_SEARCH_TERMS = [
-    "yu-gi-oh lot ancien",
-    "yugioh vintage",
-    "cartes yugioh anciennes",
-    "lot yu gi oh années 2000",
-    "blue eyes white dragon yugioh",
-    "dark magician yugioh",
-    "yugioh premiere edition",
-    "lot cartes yugioh",
+    "yugioh cartes",
+    "yu gi oh lot",
+    "cartes yugioh",
+    "lot yugioh",
 ]
 
 YGO_HIGH_VALUE = [
