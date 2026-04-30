@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-BUDGET_MAX  = 150
+BUDGET_MAX  = 9999
 SCORE_ALERT = 70
 
 SHEET_NAME       = os.getenv("GOOGLE_SHEET_NAME", "Card Agent")
@@ -127,11 +127,11 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
                 "Accept":    "application/json",
             },
             params={
-                "query":    query,
-                "market":   "fr",
-                "price_to": int(max_price),
-                "per_page": 20,
-                "order":    "newest_first",
+                "query":        query,
+                "market":       "fr",
+                "per_page":     50,
+                "order":        "newest_first",
+                "time":         "1d",   # annonces des dernières 24h uniquement
             },
             timeout=30,
         )
@@ -176,7 +176,7 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
             except Exception:
                 continue
 
-            if price <= 0 or price > max_price:
+            if price <= 0:
                 continue
 
             item_id = item.get("id", "")
