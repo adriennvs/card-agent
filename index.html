@@ -2,7 +2,6 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src *;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Card Agent — Dashboard</title>
 <style>
@@ -209,7 +208,7 @@ let allData = [], activeFilter = "all", sortField = "score_global", sortDir = -1
 async function loadData() {
   document.getElementById("last-scan").textContent = "Chargement...";
   try {
-    const r    = await fetch("https://corsproxy.io/?url=" + encodeURIComponent(CSV_URL + "&t=" + Date.now()));
+    const r    = await fetch(CSV_URL + "&t=" + Date.now());
     const text = await r.text();
     const rows = parseCSV(text);
     if (rows.length < 2) { showEmpty("Aucune donnée"); return; }
