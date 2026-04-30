@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Agent — Dashboard</title>
+<style>
+  :root {
+    --bg: #fafafa; --surface: #fff; --border: #e8e8e8;
+    --text: #1a1a1a; --muted: #888; --accent: #185FA5;
+    --green-bg: #EAF3DE; --green-text: #27500A;
+    --amber-bg: #FAEEDA; --amber-text: #633806;
+    --gray-bg: #F1EFE8; --gray-text: #444441;
+    --dbz-bg: #FEF3E6; --dbz-text: #B45309;
+    --ygo-bg: #E8F0FB; --ygo-text: #1a4a8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+           padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .metrics { display: grid; grid-template-columns: repeat(5, 1fr);
+             gap: 12px; padding: 20px 24px 0; }
+  .metric { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px; }
+  .metric.dbz { border-color: #f0a860; }
+  .metric.ygo { border-color: #7faade; }
+  .metric .label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                   letter-spacing: .5px; margin-bottom: 6px; }
+  .metric .value { font-size: 24px; font-weight: 600; }
+  .metric .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .section { padding: 20px 24px; }
+  .section h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px;
+                display: flex; align-items: center; gap: 8px; }
+  .badge-count { background: var(--accent); color: #fff; border-radius: 20px;
+                 padding: 1px 8px; font-size: 11px; }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-btn { padding: 5px 12px; border: 1px solid var(--border);
+                border-radius: 20px; font-size: 12px; cursor: pointer;
+                background: var(--surface); color: var(--text); transition: all 0.15s; }
+  .filter-btn:hover { border-color: var(--accent); }
+  .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .filter-btn.dbz-btn.active { background: #B45309; border-color: #B45309; }
+  .filter-btn.ygo-btn.active { background: #1a4a8a; border-color: #1a4a8a; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface);
+          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  thead tr { background: #f5f5f5; }
+  th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600;
+       text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+       cursor: pointer; white-space: nowrap; }
+  th:hover { color: var(--text); }
+  td { padding: 10px 12px; border-top: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: #f9f9f9; }
+  tr.row-dbz td { border-left: 3px solid #f0a860; }
+  tr.row-ygo td { border-left: 3px solid #7faade; }
+
+  .univ-tag { display: inline-block; padding: 2px 8px; border-radius: 4px;
+              font-size: 11px; font-weight: 600; }
+  .tag-dbz { background: var(--dbz-bg); color: var(--dbz-text); }
+  .tag-ygo { background: var(--ygo-bg); color: var(--ygo-text); }
+
+  .titre { font-weight: 500; font-size: 13px; max-width: 260px;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kw-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+  .kw { background: var(--gray-bg); color: var(--gray-text); border-radius: 3px;
+        padding: 1px 5px; font-size: 10px; }
+  .kw.high { background: var(--green-bg); color: var(--green-text); }
+
+  .score { display: inline-block; padding: 3px 10px; border-radius: 20px;
+           font-size: 12px; font-weight: 600; }
+  .score-high { background: var(--green-bg); color: var(--green-text); }
+  .score-mid  { background: var(--amber-bg); color: var(--amber-text); }
+  .score-low  { background: var(--gray-bg);  color: var(--gray-text); }
+  .score-bars { display: flex; gap: 3px; margin-top: 5px; }
+  .bar        { height: 4px; border-radius: 2px; flex: 1; background: #eee; }
+  .bar.filled { background: var(--accent); }
+
+  .ratio { font-size: 16px; font-weight: 700; color: var(--accent); }
+  .marge { font-size: 12px; font-weight: 600; }
+  .marge.good { color: #27500A; }
+  .marge.ok   { color: #633806; }
+
+  .price-buy  { font-weight: 700; font-size: 15px; }
+  .price-ref  { font-size: 12px; color: var(--muted); }
+  .price-arr  { color: var(--muted); margin: 0 3px; }
+
+  .etat { font-size: 11px; color: var(--muted); }
+  .rationale { font-size: 11px; color: var(--muted); max-width: 200px; line-height: 1.5; }
+
+  .link-btn { display: inline-block; padding: 4px 10px; border: 1px solid var(--border);
+              border-radius: 6px; font-size: 12px; color: var(--accent);
+              text-decoration: none; white-space: nowrap; }
+  .link-btn:hover { background: #f0f7ff; }
+
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .last-scan { font-size: 12px; color: var(--muted); }
+  .refresh-btn { font-size: 12px; padding: 4px 10px; cursor: pointer;
+                 border: 1px solid var(--border); border-radius: 6px;
+                 background: var(--surface); margin-left: 8px; }
+  .refresh-btn:hover { background: var(--bg); }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border);
+          padding: 0 24px; background: var(--surface); margin-top: 20px; }
+  .tab { padding: 12px 16px; font-size: 13px; cursor: pointer;
+         border-bottom: 2px solid transparent; color: var(--muted); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Card Agent</h1>
+    <p>DBZ années 90 · Yu-Gi-Oh! anciennes séries — opportunités Vinted</p>
+  </div>
+  <div style="display:flex;align-items:center">
+    <span class="last-scan" id="last-scan">—</span>
+    <button class="refresh-btn" onclick="loadData()">↺ Actualiser</button>
+  </div>
+</header>
+
+<div class="metrics">
+  <div class="metric">
+    <div class="label">Total opportunités</div>
+    <div class="value" id="m-total">—</div>
+    <div class="sub">ce scan</div>
+  </div>
+  <div class="metric dbz">
+    <div class="label">🔥 DBZ</div>
+    <div class="value" id="m-dbz">—</div>
+    <div class="sub">annonces détectées</div>
+  </div>
+  <div class="metric ygo">
+    <div class="label">⚔️ Yu-Gi-Oh!</div>
+    <div class="value" id="m-ygo">—</div>
+    <div class="sub">annonces détectées</div>
+  </div>
+  <div class="metric">
+    <div class="label">Meilleur ratio</div>
+    <div class="value" id="m-ratio">—</div>
+    <div class="sub">prix annonce / marché</div>
+  </div>
+  <div class="metric">
+    <div class="label">Score ≥ 70</div>
+    <div class="value" id="m-high">—</div>
+    <div class="sub">haute conviction</div>
+  </div>
+</div>
+
+<div class="tabs" style="margin-top:20px">
+  <div class="tab active" onclick="switchTab('opps',this)">Opportunités</div>
+  <div class="tab" onclick="switchTab('port',this)">Portefeuille</div>
+</div>
+
+<div id="tab-opps" class="tab-content active">
+  <div class="section">
+    <h2>Annonces sous-évaluées <span class="badge-count" id="badge-count">0</span></h2>
+    <div class="filters">
+      <button class="filter-btn active" onclick="setFilter('all',this)">Toutes</button>
+      <button class="filter-btn dbz-btn" onclick="setFilter('dbz',this)">🔥 DBZ uniquement</button>
+      <button class="filter-btn ygo-btn" onclick="setFilter('ygo',this)">⚔️ YGO uniquement</button>
+      <button class="filter-btn" onclick="setFilter('high',this)">Score ≥ 70</button>
+      <button class="filter-btn" onclick="setFilter('ratio',this)">Ratio ≥ x2</button>
+      <button class="filter-btn" onclick="setFilter('marge',this)">Marge ≥ 40%</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th onclick="sortBy('titre')">Article</th>
+          <th onclick="sortBy('score_global')">Score ↓</th>
+          <th onclick="sortBy('ratio_x')">Ratio</th>
+          <th onclick="sortBy('prix_annonce')">Prix → Marché</th>
+          <th onclick="sortBy('marge_estimee')">Marge</th>
+          <th>Mots-clés valeur</th>
+          <th>État</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="opp-tbody">
+        <tr><td colspan="9" class="empty">Chargement...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tab-port" class="tab-content">
+  <div style="padding:40px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:2">
+    Remplis l'onglet <strong>portefeuille</strong> dans Google Sheets après chaque achat.<br>
+    <span style="color:#bbb">date_achat · univers · article · prix_achat · plateforme_vente · prix_revente · statut · date_vente · prix_vente · pnl</span>
+  </div>
+</div>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhBCDf2hUffMPrhpeCpqe_WlbnxhML2k7kWBnH_hYMjZNP_nPEQWIE8-qBL7WKpZyqH6qYjLVvwxtJ/pub?output=csv";
+
+let allData = [], activeFilter = "all", sortField = "score_global", sortDir = -1;
+
+async function loadData() {
+  document.getElementById("last-scan").textContent = "Chargement...";
+  try {
+    const r    = await fetch(CSV_URL + "&t=" + Date.now());
+    const text = await r.text();
+    const rows = parseCSV(text);
+    if (rows.length < 2) { showEmpty("Aucune donnée"); return; }
+    const headers = rows[0].map(h => h.trim());
+    allData = rows.slice(1)
+      .map(row => { const o={}; headers.forEach((h,i)=>o[h]=(row[i]||"").trim()); return o; })
+      .filter(o => o.titre);
+    render();
+    updateMetrics();
+    document.getElementById("last-scan").textContent =
+      "Dernier scan : " + (allData[0]?.date_scan || "—");
+  } catch(e) {
+    showEmpty("Erreur de chargement — configure l'URL CSV");
+    document.getElementById("last-scan").textContent = "Erreur";
+  }
+}
+
+function parseCSV(text) {
+  return text.split(/\r?\n/).map(line => {
+    const res=[]; let cur=""; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){inQ=!inQ;}
+      else if(c===','&&!inQ){res.push(cur);cur="";}
+      else{cur+=c;}
+    }
+    res.push(cur); return res;
+  }).filter(r=>r.some(c=>c.trim()));
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  render();
+}
+
+function sortBy(f) {
+  if(sortField===f) sortDir*=-1; else {sortField=f; sortDir=-1;}
+  render();
+}
+
+function getFiltered() {
+  return allData.filter(o => {
+    const sc  = parseFloat(o.score_global)||0;
+    const rx  = parseFloat(o.ratio_x)||0;
+    const mg  = parseFloat(o.marge_estimee)||0;
+    const unv = (o.univers||"").toUpperCase();
+    if(activeFilter==="dbz")   return unv==="DBZ";
+    if(activeFilter==="ygo")   return unv==="YGO";
+    if(activeFilter==="high")  return sc>=70;
+    if(activeFilter==="ratio") return rx>=2;
+    if(activeFilter==="marge") return mg>=40;
+    return true;
+  }).sort((a,b) => {
+    const av=parseFloat(a[sortField])||0, bv=parseFloat(b[sortField])||0;
+    return sortDir===-1 ? bv-av : av-bv;
+  });
+}
+
+function scoreClass(s) {
+  if(s>=70) return "score-high";
+  if(s>=50) return "score-mid";
+  return "score-low";
+}
+function scoreBars(s) {
+  const n=Math.round(s/20);
+  return Array.from({length:5},(_,i)=>`<div class="bar${i<n?" filled":""}"></div>`).join("");
+}
+
+function render() {
+  const data = getFiltered();
+  document.getElementById("badge-count").textContent = data.length;
+  if(!data.length){
+    document.getElementById("opp-tbody").innerHTML=
+      '<tr><td colspan="9" class="empty">Aucun résultat pour ce filtre</td></tr>';
+    return;
+  }
+  document.getElementById("opp-tbody").innerHTML = data.map(o => {
+    const sc   = parseFloat(o.score_global)||0;
+    const rx   = parseFloat(o.ratio_x)||0;
+    const mg   = parseFloat(o.marge_estimee)||0;
+    const prix = parseFloat(o.prix_annonce)||0;
+    const ref  = parseFloat(o.prix_marche_ref)||0;
+    const unv  = (o.univers||"").toUpperCase();
+    const isDBZ = unv==="DBZ";
+
+    const kws = (o.mots_cles_valeur||"").split(",").filter(k=>k.trim());
+    const kwHtml = kws.slice(0,4).map(k=>
+      `<span class="kw high">${k.trim()}</span>`
+    ).join("");
+
+    return `<tr class="${isDBZ?'row-dbz':'row-ygo'}">
+      <td>
+        <span class="univ-tag ${isDBZ?'tag-dbz':'tag-ygo'}">
+          ${isDBZ?'🔥 DBZ':'⚔️ YGO'}
+        </span>
+      </td>
+      <td>
+        <div class="titre" title="${o.titre}">${o.titre}</div>
+        <div class="kw-tags">${kwHtml}</div>
+      </td>
+      <td>
+        <span class="score ${scoreClass(sc)}">${sc}/100</span>
+        <div class="score-bars">${scoreBars(sc)}</div>
+      </td>
+      <td><div class="ratio">x${rx||"—"}</div></td>
+      <td>
+        <span class="price-buy">${prix?prix+"€":"—"}</span>
+        <span class="price-arr">→</span>
+        <span class="price-ref">~${ref?ref+"€":"?"}</span>
+      </td>
+      <td>
+        <span class="marge ${mg>=40?'good':'ok'}">
+          ${mg?"+"+mg+"%":"—"}
+        </span>
+      </td>
+      <td><div style="font-size:11px;color:var(--muted)">${o.mots_cles_valeur||"—"}</div></td>
+      <td><span class="etat">${o.etat||"—"}</span></td>
+      <td><a href="${o.lien_annonce}" target="_blank" class="link-btn">Voir →</a></td>
+    </tr>`;
+  }).join("");
+}
+
+function showEmpty(msg) {
+  document.getElementById("opp-tbody").innerHTML=
+    `<tr><td colspan="9" class="empty">${msg}</td></tr>`;
+}
+
+function updateMetrics() {
+  const total = allData.length;
+  const dbz   = allData.filter(o=>(o.univers||"").toUpperCase()==="DBZ").length;
+  const ygo   = allData.filter(o=>(o.univers||"").toUpperCase()==="YGO").length;
+  const ratios= allData.map(o=>parseFloat(o.ratio_x)||0).filter(r=>r>0);
+  const best  = ratios.length ? "x"+Math.max(...ratios).toFixed(1) : "—";
+  const high  = allData.filter(o=>(parseFloat(o.score_global)||0)>=70).length;
+  document.getElementById("m-total").textContent = total||"—";
+  document.getElementById("m-dbz").textContent   = dbz||"0";
+  document.getElementById("m-ygo").textContent   = ygo||"0";
+  document.getElementById("m-ratio").textContent = best;
+  document.getElementById("m-high").textContent  = high||"—";
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+}
+
+loadData();
+setInterval(loadData, 5*60*1000);
+</script>
+</body>
+</html>
