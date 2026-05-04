@@ -1,12 +1,10 @@
 """
-Card Opportunity Agent — v4
-Univers  : DBZ années 90 + Yu-Gi-Oh! anciennes séries
-Sources  : Vinted (ScrapeBadger) · eBay sold listings
-Scoring  : ratio prix annonce / prix marché · liquidité · mots-clés de valeur
+Card Opportunity Agent — v5
+Fix : 1 appel eBay par terme de recherche (pas par annonce)
+      Requêtes eBay en français + siteid=71 (eBay France)
 """
 
 import os
-import re
 import time
 import json
 import random
@@ -24,7 +22,6 @@ log = logging.getLogger(__name__)
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-BUDGET_MAX  = 9999
 SCORE_ALERT = 70
 
 SHEET_NAME       = os.getenv("GOOGLE_SHEET_NAME", "Card Agent")
@@ -45,14 +42,21 @@ HEADERS = {
 
 # ─── Mots-clés ────────────────────────────────────────────────────────────────
 
-DBZ_SEARCH_TERMS = [
-    "le grand combat dragon ball",
-    "hondan dragon ball",
-    "carddass dragon ball",
-    "super battle dragon ball",
-    "visual adventure dragon ball",
-    "cartes dbz",
-]
+# Terme Vinted → terme eBay France correspondant
+DBZ_QUERIES = {
+    "le grand combat dragon ball":    "dragon ball le grand combat carte",
+    "hondan dragon ball":             "dragon ball hondan carddass",
+    "carddass dragon ball":           "dragon ball carddass carte",
+    "super battle dragon ball":       "dragon ball super battle carte",
+    "visual adventure dragon ball":   "dragon ball visual adventure carte",
+    "cartes dbz":                     "dragon ball z carte française",
+}
+
+YGO_QUERIES = {
+    "yugioh cartes":   "yu-gi-oh carte française",
+    "yu gi oh lot":    "yu-gi-oh lot cartes",
+    "cartes yugioh":   "yu-gi-oh carte française",
+}
 
 DBZ_HIGH_VALUE = [
     "prisme", "prism", "flash", "hors série", "hors-série",
@@ -62,19 +66,12 @@ DBZ_HIGH_VALUE = [
     "gotenks", "broly", "gogeta", "vegeto", "sangoku",
 ]
 
-YGO_SEARCH_TERMS = [
-    "yugioh cartes",
-    "yu gi oh lot",
-    "cartes yugioh",
-]
-
 YGO_HIGH_VALUE = [
-    "1ère édition", "1st edition", "first edition", "premiere edition",
+    "1ère édition", "1st edition", "first edition",
     "ultra rare", "secret rare", "ghost rare",
     "blue eyes", "dark magician", "exodia",
     "limited edition", "lob", "mrd", "mrl",
-    "metal raiders", "legend of blue eyes",
-    "holo", "holographique", "mirror force",
+    "metal raiders", "holo", "holographique", "mirror force",
 ]
 
 # ─── Google Sheets ─────────────────────────────────────────────────────────────
@@ -137,26 +134,16 @@ def search_vinted(query: str) -> list[dict]:
             },
             timeout=30,
         )
-
-        log.info(f"ScrapeBadger '{query}' → status {r.status_code}")
-
         if r.status_code == 429:
-            log.warning("Rate limit — attente 60s")
+            log.warning("Rate limit ScrapeBadger — attente 60s")
             time.sleep(60)
             return []
-        if r.status_code == 401:
-            log.warning("Clé API invalide")
-            return []
-        if r.status_code == 402:
-            log.warning("Crédits épuisés")
-            return []
         if r.status_code not in (200, 201):
-            log.warning(f"Status inattendu {r.status_code}")
+            log.warning(f"ScrapeBadger status {r.status_code} pour '{query}'")
             return []
 
-        raw = r.json()
-        items_raw = raw.get("items", [])
-        log.info(f"Vinted '{query}' → {len(items_raw)} items bruts")
+        items_raw = r.json().get("items", [])
+        log.info(f"Vinted '{query}' → {len(items_raw)} annonces")
 
         items = []
         for item in items_raw:
@@ -168,10 +155,8 @@ def search_vinted(query: str) -> list[dict]:
                     price = float(price_raw or 0)
             except Exception:
                 continue
-
             if price <= 0:
                 continue
-
             item_id = item.get("id", "")
             user    = item.get("user", {})
             items.append({
@@ -181,21 +166,21 @@ def search_vinted(query: str) -> list[dict]:
                 "vendeur":    str(user.get("login", user.get("username", ""))),
                 "lien":       item.get("url", f"https://www.vinted.fr/items/{item_id}"),
                 "plateforme": "vinted",
-                "query":      query,
             })
-
-        log.info(f"Vinted '{query}' → {len(items)} annonces avec prix valide")
         return items
 
     except Exception as e:
         log.warning(f"ScrapeBadger error ('{query}'): {e}")
         return []
 
-# ─── Source 2 : eBay sold listings ────────────────────────────────────────────
+# ─── Source 2 : eBay sold listings — 1 appel par terme ────────────────────────
 
-def get_ebay_sold_prices(query: str) -> dict:
+def get_ebay_sold_prices(ebay_query: str) -> dict:
+    """
+    1 appel eBay par terme de recherche Vinted.
+    siteid=71 → eBay France uniquement → prix en euros français.
+    """
     if not EBAY_APP_ID:
-        log.warning("EBAY_APP_ID non configuré")
         return {}
     try:
         r = requests.get(
@@ -205,7 +190,8 @@ def get_ebay_sold_prices(query: str) -> dict:
                 "SERVICE-VERSION":               "1.0.0",
                 "SECURITY-APPNAME":              EBAY_APP_ID,
                 "RESPONSE-DATA-FORMAT":          "JSON",
-                "keywords":                      query,
+                "keywords":                      ebay_query,
+                "siteid":                        "71",
                 "itemFilter(0).name":            "SoldItemsOnly",
                 "itemFilter(0).value":           "true",
                 "itemFilter(1).name":            "Currency",
@@ -216,19 +202,17 @@ def get_ebay_sold_prices(query: str) -> dict:
             headers=HEADERS,
             timeout=15,
         )
+        log.info(f"eBay '{ebay_query}' → status {r.status_code}")
 
-        log.info(f"eBay '{query}' → status {r.status_code}")
+        if r.status_code != 200:
+            return {}
 
-        data = r.json()
         items_data = (
-            data
-            .get("findCompletedItemsResponse", [{}])[0]
-            .get("searchResult", [{}])[0]
-            .get("item", [])
+            r.json()
+             .get("findCompletedItemsResponse", [{}])[0]
+             .get("searchResult", [{}])[0]
+             .get("item", [])
         )
-
-        log.info(f"eBay '{query}' → {len(items_data)} ventes trouvées")
-
         prices = []
         for item in items_data:
             try:
@@ -238,8 +222,7 @@ def get_ebay_sold_prices(query: str) -> dict:
             except Exception:
                 pass
 
-        log.info(f"eBay '{query}' → {len(prices)} prix extraits")
-
+        log.info(f"eBay '{ebay_query}' → {len(prices)} prix extraits")
         if not prices:
             return {}
 
@@ -253,7 +236,7 @@ def get_ebay_sold_prices(query: str) -> dict:
             "prix_max":    round(prices[-1], 2),
         }
     except Exception as e:
-        log.warning(f"eBay error ('{query}'): {e}")
+        log.warning(f"eBay error ('{ebay_query}'): {e}")
         return {}
 
 # ─── Détection mots-clés ──────────────────────────────────────────────────────
@@ -297,11 +280,11 @@ def score_annonce(annonce: dict, prix_ref: dict, value_kw: list) -> dict:
 
     parts = []
     if prix_ref_val > 0:
-        parts.append(f"prix marché ~{prix_ref_val}€ pour {prix}€ (x{round(ratio,1)})")
+        parts.append(f"prix marché eBay.fr ~{prix_ref_val}€ pour {prix}€ (x{round(ratio,1)})")
     if marge > 0:
         parts.append(f"marge estimée {int(marge*100)}%")
     if nb_ventes > 0:
-        parts.append(f"{nb_ventes} ventes similaires eBay")
+        parts.append(f"{nb_ventes} ventes similaires eBay.fr")
     if value_kw:
         parts.append(f"mots-clés : {', '.join(value_kw[:3])}")
 
@@ -375,7 +358,7 @@ def send_alert(opps: list):
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def run():
-    log.info("=== Card Agent v4 ===")
+    log.info("=== Card Agent v5 ===")
     sh = get_sheet()
     ensure_sheets(sh)
     ws_opp = sh.worksheet("opportunites")
@@ -394,69 +377,69 @@ def run():
 
     all_scored: list[dict] = []
     seen_urls: set[str]    = set()
-    prix_cache: dict       = {}
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # ── DBZ ───────────────────────────────────────────────────────────────────
     log.info("=== Scan DBZ ===")
-    dbz_queries = random.sample(DBZ_SEARCH_TERMS, min(3, len(DBZ_SEARCH_TERMS)))
+    dbz_items = list(DBZ_QUERIES.items())
+    random.shuffle(dbz_items)
 
-    for query in dbz_queries:
-        annonces = search_vinted(query)
+    for vinted_query, ebay_query in dbz_items[:3]:
+        # 1 appel Vinted
+        annonces = search_vinted(vinted_query)
         time.sleep(12)
 
+        # 1 appel eBay par terme (pas par annonce)
+        prix_ref = get_ebay_sold_prices(ebay_query)
+        if prix_ref:
+            ws_ref.append_row([
+                now, "DBZ", ebay_query,
+                prix_ref.get("nb_ventes", 0),
+                prix_ref.get("prix_moyen", 0),
+                prix_ref.get("prix_median", 0),
+                prix_ref.get("prix_min", 0),
+                prix_ref.get("prix_max", 0),
+            ])
+        time.sleep(3)
+
+        # Score toutes les annonces avec ce prix de référence
         for ann in annonces:
             if ann["lien"] in seen_urls:
                 continue
             seen_urls.add(ann["lien"])
             ann["univers"] = "DBZ"
-            value_kw  = detect_keywords(ann["titre"] + " " + query, DBZ_HIGH_VALUE)
-            ref_query = "carte dragon ball z " + " ".join(value_kw[:2]) if value_kw else "carte dragon ball z vintage"
-
-            if ref_query not in prix_cache:
-                prix_cache[ref_query] = get_ebay_sold_prices(ref_query)
-                pref = prix_cache[ref_query]
-                if pref:
-                    ws_ref.append_row([
-                        now, "DBZ", ref_query,
-                        pref.get("nb_ventes", 0), pref.get("prix_moyen", 0),
-                        pref.get("prix_median", 0), pref.get("prix_min", 0),
-                        pref.get("prix_max", 0),
-                    ])
-                time.sleep(1)
-
-            scored = score_annonce(ann, prix_cache.get(ref_query, {}), value_kw)
+            value_kw = detect_keywords(ann["titre"] + " " + vinted_query, DBZ_HIGH_VALUE)
+            scored   = score_annonce(ann, prix_ref, value_kw)
             all_scored.append(scored)
 
     # ── YGO ───────────────────────────────────────────────────────────────────
     log.info("=== Scan YGO ===")
-    ygo_queries = random.sample(YGO_SEARCH_TERMS, min(2, len(YGO_SEARCH_TERMS)))
+    ygo_items = list(YGO_QUERIES.items())
+    random.shuffle(ygo_items)
 
-    for query in ygo_queries:
-        annonces = search_vinted(query)
+    for vinted_query, ebay_query in ygo_items[:2]:
+        annonces = search_vinted(vinted_query)
         time.sleep(12)
+
+        prix_ref = get_ebay_sold_prices(ebay_query)
+        if prix_ref:
+            ws_ref.append_row([
+                now, "YGO", ebay_query,
+                prix_ref.get("nb_ventes", 0),
+                prix_ref.get("prix_moyen", 0),
+                prix_ref.get("prix_median", 0),
+                prix_ref.get("prix_min", 0),
+                prix_ref.get("prix_max", 0),
+            ])
+        time.sleep(3)
 
         for ann in annonces:
             if ann["lien"] in seen_urls:
                 continue
             seen_urls.add(ann["lien"])
             ann["univers"] = "YGO"
-            value_kw  = detect_keywords(ann["titre"] + " " + query, YGO_HIGH_VALUE)
-            ref_query = "yugioh " + " ".join(value_kw[:2]) if value_kw else "yugioh carte vintage"
-
-            if ref_query not in prix_cache:
-                prix_cache[ref_query] = get_ebay_sold_prices(ref_query)
-                pref = prix_cache[ref_query]
-                if pref:
-                    ws_ref.append_row([
-                        now, "YGO", ref_query,
-                        pref.get("nb_ventes", 0), pref.get("prix_moyen", 0),
-                        pref.get("prix_median", 0), pref.get("prix_min", 0),
-                        pref.get("prix_max", 0),
-                    ])
-                time.sleep(1)
-
-            scored = score_annonce(ann, prix_cache.get(ref_query, {}), value_kw)
+            value_kw = detect_keywords(ann["titre"] + " " + vinted_query, YGO_HIGH_VALUE)
+            scored   = score_annonce(ann, prix_ref, value_kw)
             all_scored.append(scored)
 
     # ── Écriture Sheet ────────────────────────────────────────────────────────
@@ -500,7 +483,7 @@ def run():
     else:
         log.info("Aucune alerte — seuil non atteint")
 
-    log.info("=== Scan terminé v4 ===")
+    log.info("=== Scan terminé v5 ===")
 
 if __name__ == "__main__":
     run()
