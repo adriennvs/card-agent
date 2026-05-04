@@ -222,6 +222,8 @@ def get_ebay_sold_prices(query: str) -> dict:
             timeout=15,
         )
         items_data = (
+            if items_data:
+    log.info(f"Premier item eBay : {items_data[0].get('sellingStatus', 'N/A')}")
             r.json()
              .get("findCompletedItemsResponse", [{}])[0]
              .get("searchResult", [{}])[0]
