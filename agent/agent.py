@@ -1,6 +1,8 @@
 """
-Card Opportunity Agent — v3
-Debug : log brut ScrapeBadger pour identifier le format de réponse
+Card Opportunity Agent — v4
+Univers  : DBZ années 90 + Yu-Gi-Oh! anciennes séries
+Sources  : Vinted (ScrapeBadger) · eBay sold listings
+Scoring  : ratio prix annonce / prix marché · liquidité · mots-clés de valeur
 """
 
 import os
@@ -115,7 +117,7 @@ def ensure_sheets(sh):
 
 # ─── Source 1 : Vinted via ScrapeBadger ───────────────────────────────────────
 
-def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
+def search_vinted(query: str) -> list[dict]:
     if not SCRAPEBADGER_KEY:
         log.warning("SCRAPEBADGER_API_KEY non configurée")
         return []
@@ -127,11 +129,11 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
                 "Accept":    "application/json",
             },
             params={
-                "query":        query,
-                "market":       "fr",
-                "per_page":     50,
-                "order":        "newest_first",
-                "time":         "1d",   # annonces des dernières 24h uniquement
+                "query":    query,
+                "market":   "fr",
+                "per_page": 50,
+                "order":    "newest_first",
+                "time":     "1d",
             },
             timeout=30,
         )
@@ -153,17 +155,9 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
             return []
 
         raw = r.json()
-
-        # ── DEBUG : log structure de la réponse ──
-        log.info(f"Clés réponse : {list(raw.keys())}")
         items_raw = raw.get("items", [])
-        log.info(f"Nb items bruts : {len(items_raw)}")
-        if items_raw:
-            first = items_raw[0]
-            log.info(f"Premier item clés : {list(first.keys())}")
-            log.info(f"Premier item price : {first.get('price')} | titre : {first.get('title','')[:40]}")
+        log.info(f"Vinted '{query}' → {len(items_raw)} items bruts")
 
-        # ── Parse ──
         items = []
         for item in items_raw:
             try:
@@ -190,7 +184,7 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
                 "query":      query,
             })
 
-        log.info(f"Vinted '{query}' → {len(items)} annonces après filtre prix ≤ {max_price}€")
+        log.info(f"Vinted '{query}' → {len(items)} annonces avec prix valide")
         return items
 
     except Exception as e:
@@ -201,6 +195,7 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
 
 def get_ebay_sold_prices(query: str) -> dict:
     if not EBAY_APP_ID:
+        log.warning("EBAY_APP_ID non configuré")
         return {}
     try:
         r = requests.get(
@@ -221,24 +216,33 @@ def get_ebay_sold_prices(query: str) -> dict:
             headers=HEADERS,
             timeout=15,
         )
+
+        log.info(f"eBay '{query}' → status {r.status_code}")
+
+        data = r.json()
         items_data = (
-            if items_data:
-    log.info(f"Premier item eBay : {items_data[0].get('sellingStatus', 'N/A')}")
-            r.json()
-             .get("findCompletedItemsResponse", [{}])[0]
-             .get("searchResult", [{}])[0]
-             .get("item", [])
+            data
+            .get("findCompletedItemsResponse", [{}])[0]
+            .get("searchResult", [{}])[0]
+            .get("item", [])
         )
+
+        log.info(f"eBay '{query}' → {len(items_data)} ventes trouvées")
+
         prices = []
         for item in items_data:
             try:
                 p = float(item["sellingStatus"][0]["currentPrice"][0]["__value__"])
-                if 0 < p < 500:
+                if 0 < p < 1000:
                     prices.append(p)
             except Exception:
                 pass
+
+        log.info(f"eBay '{query}' → {len(prices)} prix extraits")
+
         if not prices:
             return {}
+
         prices.sort()
         n = len(prices)
         return {
@@ -371,7 +375,7 @@ def send_alert(opps: list):
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def run():
-    log.info("=== Card Agent v3 ===")
+    log.info("=== Card Agent v4 ===")
     sh = get_sheet()
     ensure_sheets(sh)
     ws_opp = sh.worksheet("opportunites")
@@ -496,7 +500,7 @@ def run():
     else:
         log.info("Aucune alerte — seuil non atteint")
 
-    log.info("=== Scan terminé v3 ===")
+    log.info("=== Scan terminé v4 ===")
 
 if __name__ == "__main__":
     run()
