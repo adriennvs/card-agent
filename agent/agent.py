@@ -167,12 +167,11 @@ def search_vinted(query: str, max_price: float = BUDGET_MAX) -> list[dict]:
         items = []
         for item in items_raw:
             try:
-                price_val = item.get("price", 0)
-                # price peut être string "15.00", float, ou dict
-                if isinstance(price_val, dict):
-                    price = float(price_val.get("amount", 0) or 0)
+                price_raw = item.get("price", {})
+                if isinstance(price_raw, dict):
+                    price = float(price_raw.get("amount", 0) or 0)
                 else:
-                    price = float(price_val or 0)
+                    price = float(price_raw or 0)
             except Exception:
                 continue
 
